@@ -1,9 +1,13 @@
 import cors from "cors";
 import express, { Express, Request, Response } from "express";
 import morgan from "morgan";
+import { connectDB } from "./config/db";
 import { env } from "./utils/env";
 
 const app: Express = express();
+
+// Connect to db
+connectDB();
 
 // Enable CORS
 app.use(
