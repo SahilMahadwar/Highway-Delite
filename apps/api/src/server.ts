@@ -2,6 +2,7 @@ import cors from "cors";
 import express, { Express, Request, Response } from "express";
 import morgan from "morgan";
 import { connectDB } from "./config/db";
+import { authRouter } from "./routes";
 import { env } from "./utils/env";
 
 const app: Express = express();
@@ -26,6 +27,9 @@ if (env.NODE_ENV === "development") {
 } else {
   app.use(morgan("short"));
 }
+
+// Mount routers
+app.use("/api/v1/auth", authRouter);
 
 app.get("/", (req: Request, res: Response) => {
   res.send("Highway delite API");
