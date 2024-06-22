@@ -3,7 +3,7 @@ import mongoose, { Document, Schema } from "mongoose";
 export interface OTP extends Document {
   email: string;
   otp: string;
-  expiry: Date;
+  expiresAt: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -12,14 +12,15 @@ const OTPSchema: Schema = new Schema(
   {
     email: { type: String, required: true },
     otp: { type: Number, required: true },
-    expiry: { type: Date },
+
+    expiresAt: { type: Date, index: { expires: "10m" } },
   },
   { timestamps: true }
 );
 
 OTPSchema.pre<OTP>("save", function (next) {
-  if (!this.expiry) {
-    this.expiry = new Date(Date.now() + 10 * 60 * 1000); // Set expiry to 10 minutes from now
+  if (!this.expiresAt) {
+    this.expiresAt = new Date(Date.now() + 10 * 60 * 1000); // Set expiry to 10 minutes from now
   }
   next();
 });

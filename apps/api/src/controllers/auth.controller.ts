@@ -1,8 +1,10 @@
 import { Request, Response } from "express";
+import jwt from "jsonwebtoken";
 import { otpTemplate } from "../libs/email-templates/otp";
 import Otp from "../models/Otp";
 import User from "../models/User";
 import { sendMail } from "../services/email.service";
+import { env } from "../utils/env";
 
 // @desc    Register user
 // @route   POST /api/v1/auth/login
@@ -24,8 +26,39 @@ export const login = async (req: Request, res: Response) => {
 
 export const verifyOtp = async (req: Request, res: Response) => {
   try {
+    const { email, otp } = req.body;
+
+    // Find the OTP record for the given email
+    const otpRecord = await Otp.findOne({ email: email });
+
+    if (!otpRecord) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired OTP",
+      });
+    }
+
+    // Check if the OTP matches and has not expired
+    const currentTime = new Date();
+
+    if (otpRecord.otp !== otp || otpRecord.expiresAt < currentTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired OTP",
+      });
+    }
+
+    // Remove the OTP document from the database so it cant be used more than once
+    await Otp.deleteOne({ email: email });
+
+    // Generate JWT token
+    const token = jwt.sign({ email: email }, env.JWT_SECRET, {
+      expiresIn: "1d",
+    });
+
     res.status(200).json({
-      message: "verify otp",
+      success: true,
+      token: token,
     });
   } catch (error) {
     res.status(500).json({
