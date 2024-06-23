@@ -1,12 +1,12 @@
 class APIResponse<T> {
   success: boolean;
-  statusCode: number;
+  code: number;
   message: string;
   data: T;
 
-  constructor(statusCode: number, data: T, message = "success") {
-    this.success = statusCode < 400;
-    this.statusCode = statusCode;
+  constructor(code: number, data: T, message = "success") {
+    this.success = code < 400;
+    this.code = code;
     this.message = message;
     this.data = data;
   }

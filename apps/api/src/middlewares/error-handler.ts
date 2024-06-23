@@ -1,35 +1,36 @@
-import { Request, Response } from "express";
-import { Error } from "mongoose";
+import { NextFunction, Request, Response } from "express";
+import { ValidationError } from "express-validation";
 import { ErrorResponse } from "../utils/error-response";
 
-interface CustomError extends Error {
-  code?: number;
-  value?: string;
-  statusCode?: number;
-}
-
-const errorHandler = (err: CustomError, req: Request, res: Response) => {
-  let error: CustomError = { ...err };
-  error.message = err.message;
-
-  // Log to console for dev
-  console.log(err.name);
-
-  // Mongoose bad ObjectId
-  if (err.name === "CastError") {
-    const message = `Resource not found with id of ${err.value}`;
-    error = new ErrorResponse(message, 404);
+const errorHandler = (
+  err: Error,
+  req: Request,
+  res: Response,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  next: NextFunction
+) => {
+  if (err instanceof ErrorResponse) {
+    res.status(err.statusCode).json({
+      success: false,
+      code: err.statusCode,
+      message: err.message,
+      err: err,
+    });
+  } else if (err instanceof ValidationError) {
+    res.status(err.statusCode).json({
+      success: false,
+      code: err.statusCode,
+      message: "Validation Error",
+      err: err.details,
+    });
+  } else {
+    res.status(500).json({
+      success: false,
+      code: 500,
+      message: "Internal Server Error",
+      err: err.message,
+    });
   }
-
-  // Mongoose duplicate Key
-  if (err.code === 11000) {
-    const message = `Duplicate field value entered`;
-    error = new ErrorResponse(message, 400);
-  }
-
-  res
-    .status(error.statusCode || 500)
-    .json({ success: false, error: error.message || "Server Error" });
 };
 
 export { errorHandler };

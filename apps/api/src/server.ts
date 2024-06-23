@@ -1,13 +1,11 @@
 import cors from "cors";
-import express, { Express, NextFunction, Request, Response } from "express";
+import express, { Express, Request, Response } from "express";
 import morgan from "morgan";
 import { connectDB } from "./config/db";
-
-import { ValidationError } from "express-validation";
+import { errorHandler } from "./middlewares/error-handler";
 import { responseHandler } from "./middlewares/response-handler";
 import { authRouter, userRouter } from "./routes";
 import { env } from "./utils/env";
-import { ErrorResponse } from "./utils/error-response";
 
 const app: Express = express();
 
@@ -49,32 +47,8 @@ app.use((req, res) => {
   });
 });
 
-// Error handling middleware should be the last middleware
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  if (err instanceof ErrorResponse) {
-    res.status(err.statusCode).json({
-      success: false,
-      code: err.statusCode,
-      message: err.message,
-      err: err,
-    });
-  } else if (err instanceof ValidationError) {
-    return res.status(err.statusCode).json({
-      success: false,
-      code: err.statusCode,
-      message: "Validation Error",
-      err: err.details.body,
-    });
-  } else {
-    res.status(500).json({
-      success: false,
-      code: 500,
-      message: "Internal Server Error",
-      err: err,
-    });
-  }
-});
+// Error handling middleware
+app.use(errorHandler);
 
 const PORT = env.PORT || 5000;
 
