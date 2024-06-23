@@ -16,6 +16,8 @@ const server = z.object({
   SMTP_PASS: z.string().min(1),
 
   JWT_SECRET: z.string().min(1),
+  JWT_EXPIRE: z.string().min(1),
+  JWT_COOKIE_EXPIRE: z.string().min(1),
 });
 
 const processEnv = {
@@ -30,6 +32,8 @@ const processEnv = {
   SMTP_PASS: process.env.SMTP_PASS,
 
   JWT_SECRET: process.env.JWT_SECRET,
+  JWT_EXPIRE: process.env.JWT_EXPIRE,
+  JWT_COOKIE_EXPIRE: process.env.JWT_COOKIE_EXPIRE,
 };
 
 type ServerInput = z.input<typeof server>;

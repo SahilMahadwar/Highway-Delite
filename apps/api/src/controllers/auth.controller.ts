@@ -1,20 +1,43 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { otpTemplate } from "../libs/email-templates/otp";
 import Otp from "../models/Otp";
 import User from "../models/User";
+import { matchPassword, sendTokenResponse } from "../services/auth.service";
 import { sendMail } from "../services/email.service";
 import { env } from "../utils/env";
+import { ErrorResponse } from "../utils/error-response";
 
 // @desc    Register user
 // @route   POST /api/v1/auth/login
 // @access  Public
 // @role    User
-export const login = async (req: Request, res: Response) => {
+export const login = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
-    res.status(200).json({
-      message: "login",
+    const { email, password } = req.body;
+
+    // Check user
+    const user = await User.findOne({ email: email }).select("+password");
+
+    if (!user) {
+      return next(new ErrorResponse("User not found please register", 401));
+    }
+
+    // Check if password matches
+    const isMatch = await matchPassword({
+      enteredPassword: password,
+      passwordHash: user.password,
     });
+
+    if (!isMatch) {
+      return next(new ErrorResponse("Invalid email or password", 401));
+    }
+
+    sendTokenResponse(user, 200, res);
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -84,18 +107,16 @@ export const sendEmailVerificationOTP = async (req: Request, res: Response) => {
 
     const generateOTP = Math.floor(1000 + Math.random() * 9000);
 
-    const storeOTP = new Otp({
+    const storeOTP = await Otp.create({
       email: email,
       otp: generateOTP,
     });
-
-    await storeOTP.save();
 
     const mailOptions = {
       from: 'Highway Delite OTP" <no-reply@highway-delite.com>',
       to: email,
       subject: "Verify Email",
-      html: otpTemplate({ otp: generateOTP }),
+      html: otpTemplate({ otp: parseInt(storeOTP.otp) }),
     };
 
     const sendMailRes = await sendMail(mailOptions);
@@ -118,9 +139,57 @@ export const sendEmailVerificationOTP = async (req: Request, res: Response) => {
 
 export const signUp = async (req: Request, res: Response) => {
   try {
-    res.status(200).json({
-      message: "Sign Up",
+    const { name, email, password, signUpToken } = req.body;
+
+    // Check if the user already exists
+    const userCheck = await User.findOne({ email: email });
+    if (userCheck) {
+      return res.status(400).json({
+        success: false,
+        message: "User already exists",
+      });
+    }
+
+    // check if email is verified
+    // Verify the token
+    let decoded;
+    try {
+      decoded = jwt.verify(signUpToken, env.JWT_SECRET) as {
+        email: string;
+        exp: number;
+      };
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired token",
+      });
+    }
+
+    // Check if the token email matches the request email
+    if (decoded.email !== email) {
+      return res.status(400).json({
+        success: false,
+        message: "Token email does not match request email",
+      });
+    }
+
+    // Check if the token is expired
+    const currentTime = Math.floor(Date.now() / 1000); // current time in seconds
+    if (decoded.exp < currentTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Token is expired",
+      });
+    }
+
+    // Create user
+    const user = await User.create({
+      name,
+      email,
+      password,
     });
+
+    sendTokenResponse(user, 200, res);
   } catch (error) {
     res.status(500).json({
       success: false,
