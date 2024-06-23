@@ -1,9 +1,11 @@
 import cors from "cors";
-import express, { Express, Request, Response } from "express";
+import express, { Express, NextFunction, Request, Response } from "express";
 import morgan from "morgan";
 import { connectDB } from "./config/db";
-import { authRouter } from "./routes";
+
+import { authRouter, userRouter } from "./routes";
 import { env } from "./utils/env";
+import { ErrorResponse } from "./utils/error-response";
 
 const app: Express = express();
 
@@ -30,6 +32,7 @@ if (env.NODE_ENV === "development") {
 
 // Mount routers
 app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/user", userRouter);
 
 app.get("/", (req: Request, res: Response) => {
   res.send("Highway delite API");
@@ -39,6 +42,22 @@ app.use((req, res) => {
   return res.status(404).json({
     error: "Not Found",
   });
+});
+
+// Error handling middleware should be the last middleware
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  if (err instanceof ErrorResponse) {
+    res.status(err.statusCode).json({
+      code: err.statusCode,
+      message: err.message,
+    });
+  } else {
+    res.status(500).json({
+      code: 500,
+      message: "Internal Server Error",
+    });
+  }
 });
 
 const PORT = env.PORT || 5000;

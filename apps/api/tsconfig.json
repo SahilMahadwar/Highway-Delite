@@ -19,5 +19,6 @@
     "allowJs": true
   },
   "exclude": ["node_modules"],
-  "include": ["src"]
+  "include": ["src"],
+  "typeRoots": ["./node_modules/@types", "./src/types"] // Adjust the path as necessary
 }
