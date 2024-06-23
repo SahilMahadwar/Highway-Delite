@@ -4,6 +4,7 @@ import morgan from "morgan";
 import { connectDB } from "./config/db";
 
 import { ValidationError } from "express-validation";
+import { responseHandler } from "./middlewares/response-handler";
 import { authRouter, userRouter } from "./routes";
 import { env } from "./utils/env";
 import { ErrorResponse } from "./utils/error-response";
@@ -30,6 +31,9 @@ if (env.NODE_ENV === "development") {
 } else {
   app.use(morgan("short"));
 }
+
+// Custom response handler middleware
+app.use(responseHandler);
 
 // Mount routers
 app.use("/api/v1/auth", authRouter);
