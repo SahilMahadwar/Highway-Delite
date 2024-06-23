@@ -1,8 +1,4 @@
 export const otpTemplate = ({ otp }: { otp: number }) => {
-  if (!otp) {
-    return "otp required";
-  }
-
   return `
    <!doctype html>
 <html>

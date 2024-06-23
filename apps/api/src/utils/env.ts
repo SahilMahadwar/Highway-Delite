@@ -18,6 +18,8 @@ const server = z.object({
   JWT_SECRET: z.string().min(1),
   JWT_EXPIRE: z.string().min(1),
   JWT_COOKIE_EXPIRE: z.string().min(1),
+
+  FRONTEND_URL: z.string().min(1),
 });
 
 const processEnv = {
@@ -34,6 +36,8 @@ const processEnv = {
   JWT_SECRET: process.env.JWT_SECRET,
   JWT_EXPIRE: process.env.JWT_EXPIRE,
   JWT_COOKIE_EXPIRE: process.env.JWT_COOKIE_EXPIRE,
+
+  FRONTEND_URL: process.env.FRONTEND_URL,
 };
 
 type ServerInput = z.input<typeof server>;

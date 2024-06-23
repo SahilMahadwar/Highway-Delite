@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { otpTemplate } from "../libs/email-templates/otp";
+import { passwordResetTemplate } from "../libs/email-templates/password-reset";
 import { asyncHandler } from "../middlewares/async-handler";
 import Otp from "../models/Otp";
 import User from "../models/User";
@@ -12,7 +13,6 @@ import { ErrorResponse } from "../utils/error-response";
 // @desc    Register user
 // @route   POST /api/v1/auth/login
 // @access  Public
-// @role    User
 export const login = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
     const { email, password } = req.body;
@@ -38,6 +38,9 @@ export const login = asyncHandler(
   }
 );
 
+// @desc    Verify OTP
+// @route   POST /api/v1/otp/verify
+// @access  Public
 export const verifyOtp = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
     const { email, otp } = req.body;
@@ -59,7 +62,6 @@ export const verifyOtp = asyncHandler(
     // Remove the OTP document from the database so it can't be used more than once
     await Otp.deleteOne({ email: email });
 
-    // Generate JWT token
     const token = jwt.sign({ email: email }, env.JWT_SECRET, {
       expiresIn: "1d",
     });
@@ -68,11 +70,14 @@ export const verifyOtp = asyncHandler(
   }
 );
 
+// @desc    Send OTP email
+// @route   POST /api/v1/otp/request
+// @access  Public
 export const sendEmailVerificationOTP = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
     const { email } = req.body;
 
-    // check if the user already exist
+    // Check if the user already exist
     const userCheck = await User.findOne({ email: email });
 
     if (userCheck) {
@@ -81,11 +86,13 @@ export const sendEmailVerificationOTP = asyncHandler(
 
     const generateOTP = Math.floor(1000 + Math.random() * 9000);
 
+    // Create OTP record
     const otpRecord = await Otp.create({
       email: email,
       otp: generateOTP,
     });
 
+    // Send mail
     const mailOptions = {
       from: 'Highway Delite OTP" <no-reply@highway-delite.com>',
       to: email,
@@ -113,7 +120,6 @@ export const signUp = asyncHandler(
       return next(new ErrorResponse("User already exists", 400));
     }
 
-    // check if email is verified
     // Verify the token
     let decoded;
     try {
@@ -150,5 +156,76 @@ export const signUp = asyncHandler(
     }
 
     sendTokenResponse(user, 200, res);
+  }
+);
+
+// @desc    Request password reset (send reset link to email)
+// @route   POST /api/v1/auth/reset-password/request
+// @access  Private
+export const requestPasswordReset = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const email = req.user.email;
+
+    // Find user
+    const user = await User.findOne({ email: email });
+
+    if (!user) {
+      return next(new ErrorResponse("User not found", 404));
+    }
+
+    // Generate JWT token for password reset
+    const token = jwt.sign({ email }, env.JWT_SECRET, { expiresIn: "1h" });
+
+    // Frontend reset-password page
+    const resetLink = `${env.FRONTEND_URL}/auth/reset-password?token=${token}`;
+
+    const mailOptions = {
+      from: 'Highway Delite Password Reset" <no-reply@highway-delite.com>',
+      to: email,
+      subject: "Password Reset",
+      html: passwordResetTemplate({ resetLink: resetLink }),
+    };
+
+    const sendMailRes = await sendMail(mailOptions);
+
+    if (!sendMailRes) {
+      return next(
+        new ErrorResponse("Failed to send password reset email", 500)
+      );
+    }
+
+    res.respond(200, { email: email }, "Password reset email sent");
+  }
+);
+
+// @desc    Reset password
+// @route   POST /api/v1/auth/reset-password
+// @access  Public
+export const resetPassword = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { password, token } = req.body;
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, env.JWT_SECRET) as { email: string };
+    } catch (err) {
+      return next(new ErrorResponse("Invalid or expired token", 400));
+    }
+
+    // Find user
+    const user = await User.findOne({ email: decoded.email });
+
+    if (!user) {
+      return next(new ErrorResponse("User not found", 404));
+    }
+
+    // Update user's password
+    user.password = password;
+    await user.save();
+
+    // Invalidate all existing sessions
+    // WIP
+
+    res.respond(200, { email: user.email }, "Password reset successful");
   }
 );

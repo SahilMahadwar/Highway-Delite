@@ -28,3 +28,10 @@ export const sendEmailVerificationOTPValidationSchema = {
     email: Joi.string().email().required(),
   }),
 };
+
+export const resetPasswordValidationSchema = {
+  body: Joi.object({
+    password: Joi.string().required(),
+    token: Joi.string().required(),
+  }),
+};
