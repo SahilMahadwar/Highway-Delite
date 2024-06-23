@@ -25,9 +25,8 @@ export const sendTokenResponse = (
   }
 
   res
-    .status(statusCode)
     .cookie("token", token, options)
-    .json({ success: true, token: token, user: user.transform() });
+    .respond(200, { token: token, user: user.transform() });
 };
 
 // Sign JWT and return

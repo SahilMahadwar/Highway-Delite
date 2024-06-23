@@ -64,10 +64,7 @@ export const verifyOtp = asyncHandler(
       expiresIn: "1d",
     });
 
-    res.status(200).json({
-      success: true,
-      token: token,
-    });
+    res.respond(200, { token: token }, "OTP verified successfully");
   }
 );
 
@@ -102,9 +99,7 @@ export const sendEmailVerificationOTP = asyncHandler(
       return next(new ErrorResponse("Failed to send otp", 500));
     }
 
-    res.status(200).json({
-      message: "Otp sent",
-    });
+    res.respond(200, { email: email }, "Otp sent");
   }
 );
 
