@@ -25,9 +25,17 @@ export const protectedRoute = asyncHandler(async (req, res, next) => {
 
   try {
     // Verify token
-    const decoded = jwt.verify(token, env.JWT_SECRET) as {
-      id: string;
-    };
+    let decoded;
+    try {
+      decoded = jwt.verify(token, env.JWT_SECRET) as {
+        id: string;
+      };
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired token",
+      });
+    }
 
     const user = await User.findById(decoded.id);
 

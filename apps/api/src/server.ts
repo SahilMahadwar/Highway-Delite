@@ -3,6 +3,7 @@ import express, { Express, NextFunction, Request, Response } from "express";
 import morgan from "morgan";
 import { connectDB } from "./config/db";
 
+import { ValidationError } from "express-validation";
 import { authRouter, userRouter } from "./routes";
 import { env } from "./utils/env";
 import { ErrorResponse } from "./utils/error-response";
@@ -49,13 +50,24 @@ app.use((req, res) => {
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   if (err instanceof ErrorResponse) {
     res.status(err.statusCode).json({
+      success: false,
       code: err.statusCode,
       message: err.message,
+      err: err,
+    });
+  } else if (err instanceof ValidationError) {
+    return res.status(err.statusCode).json({
+      success: false,
+      code: err.statusCode,
+      message: "Validation Error",
+      err: err.details.body,
     });
   } else {
     res.status(500).json({
+      success: false,
       code: 500,
       message: "Internal Server Error",
+      err: err,
     });
   }
 });
