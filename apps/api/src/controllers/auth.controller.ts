@@ -38,59 +38,53 @@ export const login = asyncHandler(
   }
 );
 
-export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
-  const { email, otp } = req.body;
+export const verifyOtp = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { email, otp } = req.body;
 
-  // Find the OTP record for the given email
-  const otpRecord = await Otp.findOne({ email: email });
+    // Find the OTP record for the given email
+    const otpRecord = await Otp.findOne({ email: email });
 
-  if (!otpRecord) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid or expired OTP",
+    if (!otpRecord) {
+      return next(new ErrorResponse("Invalid or expired OTP", 400));
+    }
+
+    // Check if the OTP matches and has not expired
+    const currentTime = new Date();
+
+    if (otpRecord.otp !== otp || otpRecord.expiresAt < currentTime) {
+      return next(new ErrorResponse("Invalid or expired OTP", 400));
+    }
+
+    // Remove the OTP document from the database so it can't be used more than once
+    await Otp.deleteOne({ email: email });
+
+    // Generate JWT token
+    const token = jwt.sign({ email: email }, env.JWT_SECRET, {
+      expiresIn: "1d",
+    });
+
+    res.status(200).json({
+      success: true,
+      token: token,
     });
   }
-
-  // Check if the OTP matches and has not expired
-  const currentTime = new Date();
-
-  if (otpRecord.otp !== otp || otpRecord.expiresAt < currentTime) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid or expired OTP",
-    });
-  }
-
-  // Remove the OTP document from the database so it can't be used more than once
-  await Otp.deleteOne({ email: email });
-
-  // Generate JWT token
-  const token = jwt.sign({ email: email }, env.JWT_SECRET, {
-    expiresIn: "1d",
-  });
-
-  res.status(200).json({
-    success: true,
-    token: token,
-  });
-});
+);
 
 export const sendEmailVerificationOTP = asyncHandler(
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     const { email } = req.body;
 
     // check if the user already exist
     const userCheck = await User.findOne({ email: email });
 
     if (userCheck) {
-      return res.status(200).json({
-        message: "user already exists try logging in",
-      });
+      return next(new ErrorResponse("User already exists try logging in", 500));
     }
 
     const generateOTP = Math.floor(1000 + Math.random() * 9000);
 
-    const storeOTP = await Otp.create({
+    const otpRecord = await Otp.create({
       email: email,
       otp: generateOTP,
     });
@@ -99,13 +93,13 @@ export const sendEmailVerificationOTP = asyncHandler(
       from: 'Highway Delite OTP" <no-reply@highway-delite.com>',
       to: email,
       subject: "Verify Email",
-      html: otpTemplate({ otp: parseInt(storeOTP.otp) }),
+      html: otpTemplate({ otp: parseInt(otpRecord.otp) }),
     };
 
     const sendMailRes = await sendMail(mailOptions);
 
     if (!sendMailRes) {
-      console.log(sendMailRes);
+      return next(new ErrorResponse("Failed to send otp", 500));
     }
 
     res.status(200).json({
@@ -114,56 +108,52 @@ export const sendEmailVerificationOTP = asyncHandler(
   }
 );
 
-export const signUp = asyncHandler(async (req: Request, res: Response) => {
-  const { name, email, password, signUpToken } = req.body;
+export const signUp = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { name, email, password, signUpToken } = req.body;
 
-  // Check if the user already exists
-  const userCheck = await User.findOne({ email: email });
-  if (userCheck) {
-    return res.status(400).json({
-      success: false,
-      message: "User already exists",
+    // Check if the user already exists
+    const userCheck = await User.findOne({ email: email });
+    if (userCheck) {
+      return next(new ErrorResponse("User already exists", 400));
+    }
+
+    // check if email is verified
+    // Verify the token
+    let decoded;
+    try {
+      decoded = jwt.verify(signUpToken, env.JWT_SECRET) as {
+        email: string;
+        exp: number;
+      };
+    } catch (err) {
+      return next(new ErrorResponse("Invalid or expired token", 400));
+    }
+
+    // Check if the token email matches the request email
+    if (decoded.email !== email) {
+      return next(
+        new ErrorResponse("Token email does not match request email", 400)
+      );
+    }
+
+    // Check if the token is expired
+    const currentTime = Math.floor(Date.now() / 1000); // current time in seconds
+    if (decoded.exp < currentTime) {
+      return next(new ErrorResponse("Token is expired", 400));
+    }
+
+    // Create user
+    const user = await User.create({
+      name,
+      email,
+      password,
     });
+
+    if (!user) {
+      return next(new ErrorResponse("Failed to create user", 400));
+    }
+
+    sendTokenResponse(user, 200, res);
   }
-
-  // check if email is verified
-  // Verify the token
-  let decoded;
-  try {
-    decoded = jwt.verify(signUpToken, env.JWT_SECRET) as {
-      email: string;
-      exp: number;
-    };
-  } catch (err) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid or expired token",
-    });
-  }
-
-  // Check if the token email matches the request email
-  if (decoded.email !== email) {
-    return res.status(400).json({
-      success: false,
-      message: "Token email does not match request email",
-    });
-  }
-
-  // Check if the token is expired
-  const currentTime = Math.floor(Date.now() / 1000); // current time in seconds
-  if (decoded.exp < currentTime) {
-    return res.status(400).json({
-      success: false,
-      message: "Token is expired",
-    });
-  }
-
-  // Create user
-  const user = await User.create({
-    name,
-    email,
-    password,
-  });
-
-  sendTokenResponse(user, 200, res);
-});
+);
